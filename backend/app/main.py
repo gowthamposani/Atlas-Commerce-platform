@@ -1,7 +1,15 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from app.api import auth_router, customer_router
+from app.api import (
+    auth_router,
+    catalog_router,
+    customer_router,
+    inventory_router,
+    orders_router,
+    seller_router,
+    shopping_router,
+)
 from app.core.config import get_settings
 from app.database.session import init_db
 from fastapi import FastAPI
@@ -34,3 +42,8 @@ def health_check() -> dict[str, str]:
 
 app.include_router(auth_router, prefix=settings.api_prefix)
 app.include_router(customer_router, prefix=settings.api_prefix)
+app.include_router(catalog_router, prefix=settings.api_prefix)
+app.include_router(seller_router, prefix=settings.api_prefix)
+app.include_router(inventory_router, prefix=settings.api_prefix)
+app.include_router(shopping_router, prefix=settings.api_prefix)
+app.include_router(orders_router, prefix=settings.api_prefix)

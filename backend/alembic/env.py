@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from app.core.config import get_settings
 from app.database.base import Base
-from app.models import address, customer_profile, refresh_token, user  # noqa: F401
+from app.models import address, customer_profile, marketplace, refresh_token, user  # noqa: F401
 from sqlalchemy import engine_from_config, pool
 
 config = context.config

@@ -25,7 +25,7 @@ SessionLocal = sessionmaker(
 
 
 def init_db() -> None:
-    from app.models import address, customer_profile, refresh_token, user  # noqa: F401
+    from app.models import address, customer_profile, marketplace, refresh_token, user  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 

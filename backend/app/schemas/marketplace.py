@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.models.marketplace import OrderStatus, ProductStatus
+from app.models.marketplace import OrderStatus, ProductStatus, SellerModerationStatus
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -47,6 +47,7 @@ class SellerResponse(BaseModel):
     store_name: str
     slug: str
     description: str | None
+    moderation_status: SellerModerationStatus
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -83,6 +84,7 @@ class ProductCreate(BaseModel):
     category_id: str
     name: str = Field(min_length=1, max_length=180)
     description: str = Field(min_length=1)
+    brand: str | None = Field(default=None, max_length=120)
     base_price: float = Field(gt=0)
     status: ProductStatus = ProductStatus.ACTIVE
     images: list[ProductImagePayload] = Field(default_factory=list)
@@ -93,8 +95,11 @@ class ProductUpdate(BaseModel):
     category_id: str | None = None
     name: str | None = Field(default=None, min_length=1, max_length=180)
     description: str | None = None
+    brand: str | None = Field(default=None, max_length=120)
     base_price: float | None = Field(default=None, gt=0)
     status: ProductStatus | None = None
+    is_visible: bool | None = None
+    is_featured: bool | None = None
     images: list[ProductImagePayload] | None = None
     variants: list[ProductVariantPayload] | None = None
 
@@ -108,7 +113,10 @@ class ProductListResponse(BaseModel):
     name: str
     slug: str
     description: str
+    brand: str | None
     status: ProductStatus
+    is_visible: bool
+    is_featured: bool
     base_price: float
     created_at: datetime
     updated_at: datetime
@@ -289,6 +297,8 @@ class OrderResponse(BaseModel):
     coupon_code: str | None
     payment_method: str
     payment_status: str
+    shipment_status: str
+    tracking_number: str | None
     created_at: datetime
     updated_at: datetime
     items: list[OrderItemResponse]

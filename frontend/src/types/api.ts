@@ -1,12 +1,22 @@
 export type UserRole = "customer" | "admin";
-export type ProductStatus = "draft" | "active" | "inactive" | "archived";
+export type ProductStatus = "draft" | "active" | "inactive" | "archived" | "rejected";
 export type OrderStatus =
   | "pending"
   | "confirmed"
   | "packed"
   | "shipped"
   | "delivered"
-  | "cancelled";
+  | "cancelled"
+  | "refunded";
+export type SellerModerationStatus = "pending" | "approved" | "rejected" | "suspended";
+export type ReviewStatus = "pending" | "approved" | "reported" | "deleted";
+export type PaymentStatus = "pending" | "succeeded" | "failed" | "refunded";
+export type ShipmentStatus =
+  | "pending"
+  | "label_created"
+  | "in_transit"
+  | "delivered"
+  | "failed";
 
 export interface CustomerProfile {
   id: string;
@@ -96,6 +106,7 @@ export interface Seller {
   store_name: string;
   slug: string;
   description: string | null;
+  moderation_status: SellerModerationStatus;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -125,7 +136,10 @@ export interface ProductListItem {
   name: string;
   slug: string;
   description: string;
+  brand: string | null;
   status: ProductStatus;
+  is_visible: boolean;
+  is_featured: boolean;
   base_price: number;
   created_at: string;
   updated_at: string;
@@ -267,7 +281,88 @@ export interface Order {
   coupon_code: string | null;
   payment_method: string;
   payment_status: string;
+  shipment_status: string;
+  tracking_number: string | null;
   created_at: string;
   updated_at: string;
   items: OrderItem[];
+}
+
+export interface AdminStats {
+  total_customers: number;
+  total_sellers: number;
+  total_products: number;
+  total_orders: number;
+  revenue_summary: number;
+  pending_orders: number;
+  pending_seller_approvals: number;
+}
+
+export interface AdminDashboard {
+  stats: AdminStats;
+  recent_orders: Order[];
+  pending_sellers: number;
+  pending_products: number;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: UserRole;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Review {
+  id: string;
+  product_id: string;
+  user_id: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  status: ReviewStatus;
+  report_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Report {
+  name: string;
+  generated_at: string;
+  rows: Array<Record<string, string | number | null>>;
+}
+
+export interface NotificationItem {
+  id: string;
+  user_id: string | null;
+  type: "order" | "seller" | "admin" | "payment";
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  order_id: string;
+  provider: string;
+  provider_reference: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  raw_response: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Shipment {
+  id: string;
+  order_id: string;
+  provider: string;
+  label_url: string | null;
+  tracking_number: string | null;
+  status: ShipmentStatus;
+  created_at: string;
+  updated_at: string;
 }

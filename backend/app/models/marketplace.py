@@ -30,6 +30,7 @@ class ProductStatus(str, enum.Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     ARCHIVED = "archived"
+    REJECTED = "rejected"
 
 
 class OrderStatus(str, enum.Enum):
@@ -39,6 +40,43 @@ class OrderStatus(str, enum.Enum):
     SHIPPED = "shipped"
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
+    REFUNDED = "refunded"
+
+
+class SellerModerationStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SUSPENDED = "suspended"
+
+
+class ReviewStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REPORTED = "reported"
+    DELETED = "deleted"
+
+
+class NotificationType(str, enum.Enum):
+    ORDER = "order"
+    SELLER = "seller"
+    ADMIN = "admin"
+    PAYMENT = "payment"
+
+
+class PaymentStatus(str, enum.Enum):
+    PENDING = "pending"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    REFUNDED = "refunded"
+
+
+class ShipmentStatus(str, enum.Enum):
+    PENDING = "pending"
+    LABEL_CREATED = "label_created"
+    IN_TRANSIT = "in_transit"
+    DELIVERED = "delivered"
+    FAILED = "failed"
 
 
 class DiscountType(str, enum.Enum):
@@ -78,6 +116,11 @@ class SellerProfile(Base):
     store_name: Mapped[str] = mapped_column(String(160), nullable=False)
     slug: Mapped[str] = mapped_column(String(180), unique=True, index=True, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    moderation_status: Mapped[SellerModerationStatus] = mapped_column(
+        Enum(SellerModerationStatus, name="seller_moderation_status"),
+        default=SellerModerationStatus.PENDING,
+        nullable=False,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -115,11 +158,14 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(180), nullable=False)
     slug: Mapped[str] = mapped_column(String(220), unique=True, index=True, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
+    brand: Mapped[str | None] = mapped_column(String(120), nullable=True)
     status: Mapped[ProductStatus] = mapped_column(
         Enum(ProductStatus, name="product_status"),
         default=ProductStatus.DRAFT,
         nullable=False,
     )
+    is_visible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     base_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -355,6 +401,8 @@ class Order(Base):
     coupon_code: Mapped[str | None] = mapped_column(String(60), nullable=True)
     payment_method: Mapped[str] = mapped_column(String(80), default="placeholder", nullable=False)
     payment_status: Mapped[str] = mapped_column(String(80), default="pending", nullable=False)
+    shipment_status: Mapped[str] = mapped_column(String(80), default="pending", nullable=False)
+    tracking_number: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -366,6 +414,14 @@ class Order(Base):
     user: Mapped["User"] = relationship()
     shipping_address: Mapped["Address"] = relationship()
     items: Mapped[list["OrderItem"]] = relationship(
+        back_populates="order",
+        cascade="all, delete-orphan",
+    )
+    payments: Mapped[list["PaymentTransaction"]] = relationship(
+        back_populates="order",
+        cascade="all, delete-orphan",
+    )
+    shipments: Mapped[list["Shipment"]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",
     )
@@ -403,3 +459,136 @@ class OrderItem(Base):
     product: Mapped["Product"] = relationship()
     variant: Mapped["ProductVariant"] = relationship()
     seller: Mapped["SellerProfile"] = relationship()
+
+
+class ProductReview(Base):
+    __tablename__ = "product_reviews"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[ReviewStatus] = mapped_column(
+        Enum(ReviewStatus, name="review_status"),
+        default=ReviewStatus.PENDING,
+        nullable=False,
+    )
+    report_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+    product: Mapped["Product"] = relationship()
+    user: Mapped["User"] = relationship()
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    type: Mapped[NotificationType] = mapped_column(
+        Enum(NotificationType, name="notification_type"),
+        default=NotificationType.ADMIN,
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(180), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+    user: Mapped["User"] = relationship()
+
+
+class PaymentTransaction(Base):
+    __tablename__ = "payment_transactions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    order_id: Mapped[str] = mapped_column(
+        ForeignKey("orders.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(80), default="stripe_sandbox", nullable=False)
+    provider_reference: Mapped[str] = mapped_column(String(160), unique=True, nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)
+    status: Mapped[PaymentStatus] = mapped_column(
+        Enum(PaymentStatus, name="payment_status"),
+        default=PaymentStatus.PENDING,
+        nullable=False,
+    )
+    raw_response: Mapped[dict[str, str]] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+    order: Mapped["Order"] = relationship(back_populates="payments")
+
+
+class Shipment(Base):
+    __tablename__ = "shipments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    order_id: Mapped[str] = mapped_column(
+        ForeignKey("orders.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(80), default="manual", nullable=False)
+    label_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    tracking_number: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    status: Mapped[ShipmentStatus] = mapped_column(
+        Enum(ShipmentStatus, name="shipment_status"),
+        default=ShipmentStatus.PENDING,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+    order: Mapped["Order"] = relationship(back_populates="shipments")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    actor_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    action: Mapped[str] = mapped_column(String(160), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    metadata_json: Mapped[dict[str, str]] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+    actor: Mapped["User"] = relationship()

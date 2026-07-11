@@ -9,6 +9,16 @@ import {
   CustomerProfile,
   ProfileUpdatePayload,
 } from "../../types/api";
+import {
+  PHONE_MESSAGE,
+  firstError,
+  optionalText,
+  trimmed,
+  validatePersonName,
+  validatePhone,
+  validatePostalCode,
+  validateRequiredText,
+} from "../../utils/validation";
 
 const emptyAddress: AddressPayload = {
   label: "",
@@ -61,6 +71,7 @@ export function ProfilePage() {
   });
   const [addressForm, setAddressForm] = useState<AddressPayload>(emptyAddress);
   const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const profileQuery = useQuery({ queryKey: ["customer", "profile"], queryFn: getProfile });
   const addressesQuery = useQuery({
@@ -85,6 +96,7 @@ export function ProfilePage() {
       queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
       setNotice("Profile updated.");
     },
+    onError: () => setError("Profile update failed. Check the highlighted details and try again."),
   });
 
   const createAddressMutation = useMutation({
@@ -94,6 +106,7 @@ export function ProfilePage() {
       setAddressForm(emptyAddress);
       setNotice("Address saved.");
     },
+    onError: () => setError("Address save failed. Check the address details and try again."),
   });
 
   const setDefaultMutation = useMutation({
@@ -115,20 +128,54 @@ export function ProfilePage() {
   const handleProfileSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setNotice(null);
+    setError(null);
+    if (updateProfileMutation.isPending) return;
+    const validationError = firstError(
+      validatePersonName(profileForm.first_name ?? "", "First name"),
+      validatePersonName(profileForm.last_name ?? "", "Last name"),
+      validatePhone(profileForm.phone),
+    );
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     updateProfileMutation.mutate({
-      first_name: profileForm.first_name,
-      last_name: profileForm.last_name,
-      phone: profileForm.phone?.trim() || undefined,
+      first_name: trimmed(profileForm.first_name),
+      last_name: trimmed(profileForm.last_name),
+      phone: optionalText(profileForm.phone),
     });
   };
 
   const handleAddressSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setNotice(null);
+    setError(null);
+    if (createAddressMutation.isPending) return;
+    const validationError = firstError(
+      validateRequiredText(addressForm.label, "Address label"),
+      validatePersonName(addressForm.recipient_name, "Recipient name"),
+      validateRequiredText(addressForm.line1, "Address line 1"),
+      validateRequiredText(addressForm.city, "City"),
+      validateRequiredText(addressForm.state, "State"),
+      validatePostalCode(addressForm.postal_code, addressForm.country),
+      validateRequiredText(addressForm.country, "Country"),
+      validatePhone(addressForm.phone),
+    );
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     createAddressMutation.mutate({
-      ...addressForm,
-      line2: addressForm.line2?.trim() || undefined,
-      phone: addressForm.phone?.trim() || undefined,
+      label: trimmed(addressForm.label),
+      recipient_name: trimmed(addressForm.recipient_name),
+      line1: trimmed(addressForm.line1),
+      line2: optionalText(addressForm.line2),
+      city: trimmed(addressForm.city),
+      state: trimmed(addressForm.state),
+      postal_code: trimmed(addressForm.postal_code),
+      country: trimmed(addressForm.country).toUpperCase(),
+      phone: optionalText(addressForm.phone),
+      is_default_shipping: addressForm.is_default_shipping,
     });
   };
 
@@ -145,11 +192,13 @@ export function ProfilePage() {
           {notice}
         </p>
       ) : null}
+      {error ? <p className="mb-5 text-sm font-medium text-red-700">{error}</p> : null}
 
       <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
         <form
           onSubmit={handleProfileSubmit}
           className="rounded-md border border-slate-200 bg-white p-6 shadow-sm"
+          noValidate
         >
           <h2 className="text-lg font-semibold text-slate-950">Profile details</h2>
           <div className="mt-5 grid gap-4">
@@ -189,6 +238,9 @@ export function ProfilePage() {
                 onChange={(event) =>
                   setProfileForm((current) => ({ ...current, phone: event.target.value }))
                 }
+                inputMode="tel"
+                pattern="^\+?\d{10,15}$"
+                title={PHONE_MESSAGE}
               />
             </label>
           </div>
@@ -201,6 +253,7 @@ export function ProfilePage() {
           <form
             onSubmit={handleAddressSubmit}
             className="rounded-md border border-slate-200 bg-white p-6 shadow-sm"
+            noValidate
           >
             <div className="flex items-center gap-2">
               <MapPin size={20} className="text-amber-600" aria-hidden="true" />

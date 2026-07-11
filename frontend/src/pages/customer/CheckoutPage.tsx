@@ -5,6 +5,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { cartApi, customerApi, orderApi } from "../../services/marketplace";
 import { CheckoutPayload } from "../../types/api";
 import { money } from "../../utils/money";
+import {
+  firstError,
+  optionalText,
+  trimmed,
+  validatePersonName,
+  validatePostalCode,
+  validateRequiredText,
+} from "../../utils/validation";
 
 export function CheckoutPage() {
   const navigate = useNavigate();
@@ -13,6 +21,7 @@ export function CheckoutPage() {
   const addressesQuery = useQuery({ queryKey: ["customer", "addresses"], queryFn: customerApi.addresses });
   const [shippingAddressId, setShippingAddressId] = useState("");
   const [couponCode, setCouponCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [billing, setBilling] = useState<CheckoutPayload["billing_address"]>({
     recipient_name: "",
     line1: "",
@@ -46,14 +55,38 @@ export function CheckoutPage() {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       navigate(`/orders/${order.id}/confirmation`);
     },
+    onError: () => setError("Checkout failed. Check inventory and address details."),
   });
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setError(null);
+    if (orderMutation.isPending) return;
+    const validationError = firstError(
+      validateRequiredText(shippingAddressId, "Shipping address"),
+      validatePersonName(billing.recipient_name, "Billing recipient"),
+      validateRequiredText(billing.line1, "Billing address line 1"),
+      validateRequiredText(billing.city, "Billing city"),
+      validateRequiredText(billing.state, "Billing state"),
+      validatePostalCode(billing.postal_code, billing.country),
+      validateRequiredText(billing.country, "Billing country"),
+    );
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     orderMutation.mutate({
       shipping_address_id: shippingAddressId,
-      billing_address: billing,
-      coupon_code: couponCode.trim() || undefined,
+      billing_address: {
+        recipient_name: trimmed(billing.recipient_name),
+        line1: trimmed(billing.line1),
+        line2: optionalText(billing.line2),
+        city: trimmed(billing.city),
+        state: trimmed(billing.state),
+        postal_code: trimmed(billing.postal_code),
+        country: trimmed(billing.country).toUpperCase(),
+      },
+      coupon_code: optionalText(couponCode)?.toUpperCase(),
       payment_method: "placeholder",
     });
   };
@@ -66,7 +99,7 @@ export function CheckoutPage() {
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-bold text-slate-950">Checkout</h1>
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
-        <form onSubmit={handleSubmit} className="rounded-md border border-slate-200 bg-white p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className="rounded-md border border-slate-200 bg-white p-6 shadow-sm" noValidate>
           <h2 className="text-lg font-semibold text-slate-950">Shipping address</h2>
           {addressesQuery.data?.length ? (
             <select className="field mt-4" value={shippingAddressId} onChange={(event) => setShippingAddressId(event.target.value)} required>
@@ -110,7 +143,7 @@ export function CheckoutPage() {
             <input className="field" value={couponCode} onChange={(event) => setCouponCode(event.target.value)} />
           </label>
 
-          {orderMutation.isError && <p className="mt-4 text-sm font-medium text-red-700">Checkout failed. Check inventory and address details.</p>}
+          {error ? <p className="mt-4 text-sm font-medium text-red-700">{error}</p> : null}
 
           <button type="submit" className="primary-button mt-6" disabled={!cart?.items.length || !addressesQuery.data?.length || orderMutation.isPending}>
             Create order

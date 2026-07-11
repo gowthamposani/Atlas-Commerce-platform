@@ -133,25 +133,92 @@ export function AdminDashboardPage() {
 
 function OverviewPanel() {
   const dashboardQuery = useQuery({ queryKey: ["admin", "dashboard"], queryFn: getAdminDashboard });
+  const dashboard = dashboardQuery.data;
   const stats = dashboardQuery.data?.stats;
   const tiles: Array<[string, string | number, LucideIcon]> = [
     ["Customers", stats?.total_customers ?? 0, Users],
     ["Sellers", stats?.total_sellers ?? 0, ShieldCheck],
+    ["Categories", stats?.total_categories ?? 0, FileText],
     ["Products", stats?.total_products ?? 0, PackageCheck],
     ["Orders", stats?.total_orders ?? 0, FileText],
-    ["Revenue", money(stats?.revenue_summary ?? 0), CreditCard],
+    ["Revenue", money(stats?.revenue ?? stats?.revenue_summary ?? 0), CreditCard],
     ["Pending Orders", stats?.pending_orders ?? 0, Truck],
+    ["Pending Sellers", stats?.pending_seller_approvals ?? 0, ShieldCheck],
+    ["Pending Products", stats?.pending_products ?? dashboard?.pending_products ?? 0, EyeOff],
+    ["Pending Reviews", stats?.pending_reviews ?? dashboard?.pending_reviews ?? 0, Star],
+    ["Inventory Alerts", stats?.inventory_alerts ?? dashboard?.inventory_alerts ?? 0, PackageCheck],
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {tiles.map(([label, value, Icon]) => (
-        <div className="rounded-md border border-slate-200 bg-white p-4" key={label}>
-          <Icon className="h-5 w-5 text-teal-700" />
-          <p className="mt-3 text-sm text-slate-500">{label}</p>
-          <p className="text-2xl font-semibold text-slate-950">{value}</p>
+    <div className="grid gap-6">
+      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
+        {tiles.map(([label, value, Icon]) => (
+          <div className="rounded-md border border-slate-200 bg-white p-4" key={label}>
+            <Icon className="h-5 w-5 text-teal-700" />
+            <p className="mt-3 text-sm text-slate-500">{label}</p>
+            <p className="text-2xl font-semibold text-slate-950">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="rounded-md border border-slate-200 bg-white p-4">
+          <h2 className="text-lg font-semibold text-slate-950">Top Selling Products</h2>
+          <div className="mt-4 grid gap-3">
+            {dashboard?.top_selling_products.map((item) => (
+              <div key={item.product_id} className="rounded-md border border-slate-200 p-3">
+                <p className="font-semibold text-slate-950">{item.name}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {item.units_sold} units · {money(item.revenue)}
+                </p>
+              </div>
+            ))}
+            {!dashboard?.top_selling_products.length && (
+              <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
+                Top products appear after orders are placed.
+              </p>
+            )}
+          </div>
         </div>
-      ))}
+
+        <div className="rounded-md border border-slate-200 bg-white p-4">
+          <h2 className="text-lg font-semibold text-slate-950">Top Sellers</h2>
+          <div className="mt-4 grid gap-3">
+            {dashboard?.top_sellers.map((seller) => (
+              <div key={seller.seller_id} className="rounded-md border border-slate-200 p-3">
+                <p className="font-semibold text-slate-950">{seller.store_name}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {seller.orders} orders · {money(seller.revenue)}
+                </p>
+              </div>
+            ))}
+            {!dashboard?.top_sellers.length && (
+              <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
+                Top sellers appear after marketplace orders are placed.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-slate-200 bg-white p-4">
+          <h2 className="text-lg font-semibold text-slate-950">Recent Orders</h2>
+          <div className="mt-4 grid gap-3">
+            {dashboard?.recent_orders.map((order) => (
+              <div key={order.id} className="rounded-md border border-slate-200 p-3">
+                <p className="font-semibold text-slate-950">{order.order_number}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {order.status} · {money(order.total_amount)}
+                </p>
+              </div>
+            ))}
+            {!dashboard?.recent_orders.length && (
+              <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
+                Recent orders appear after checkout activity.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

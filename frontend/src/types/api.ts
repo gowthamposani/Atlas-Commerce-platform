@@ -187,6 +187,11 @@ export interface SellerDashboard {
   active_product_count: number;
   total_stock: number;
   order_count: number;
+  revenue: number;
+  low_stock_count: number;
+  inventory_alerts: number;
+  recent_orders: Order[];
+  top_products: SellerTopProduct[];
 }
 
 export interface Warehouse {
@@ -288,14 +293,33 @@ export interface Order {
   items: OrderItem[];
 }
 
+export interface CustomerDashboard {
+  total_orders: number;
+  wishlist_items: number;
+  cart_items: number;
+  recent_orders: Order[];
+}
+
+export interface SellerTopProduct {
+  product_id: string;
+  name: string;
+  units_sold: number;
+  revenue: number;
+}
+
 export interface AdminStats {
   total_customers: number;
   total_sellers: number;
   total_products: number;
+  total_categories: number;
   total_orders: number;
+  revenue: number;
   revenue_summary: number;
   pending_orders: number;
   pending_seller_approvals: number;
+  pending_products: number;
+  pending_reviews: number;
+  inventory_alerts: number;
 }
 
 export interface AdminDashboard {
@@ -303,6 +327,20 @@ export interface AdminDashboard {
   recent_orders: Order[];
   pending_sellers: number;
   pending_products: number;
+  pending_reviews: number;
+  inventory_alerts: number;
+  top_selling_products: Array<{
+    product_id: string;
+    name: string;
+    units_sold: number;
+    revenue: number;
+  }>;
+  top_sellers: Array<{
+    seller_id: string;
+    store_name: string;
+    orders: number;
+    revenue: number;
+  }>;
 }
 
 export interface AdminUser {

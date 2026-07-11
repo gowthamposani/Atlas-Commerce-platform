@@ -160,6 +160,11 @@ export interface ProductPage {
   page_size: number;
 }
 
+export interface RecommendationResponse {
+  product_id: string;
+  recommendations: ProductListItem[];
+}
+
 export interface ProductPayload {
   category_id: string;
   name: string;

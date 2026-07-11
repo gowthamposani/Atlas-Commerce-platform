@@ -14,13 +14,13 @@ export function ProductCard({ product, onWishlist, onCart }: ProductCardProps) {
   const primaryImage = product.images.find((image) => image.is_primary) ?? product.images[0];
 
   return (
-    <article className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+    <article className="group flex h-full flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm transition hover:border-teal-200 hover:shadow-md">
       <Link to={`/products/${product.id}`} className="block">
         {primaryImage ? (
           <img
             src={primaryImage.url}
             alt={primaryImage.alt_text ?? product.name}
-            className="aspect-[4/3] w-full object-cover"
+            className="aspect-[4/3] w-full object-cover transition group-hover:scale-[1.01]"
           />
         ) : (
           <div className="flex aspect-[4/3] items-center justify-center bg-slate-100 text-sm text-slate-500">
@@ -28,7 +28,7 @@ export function ProductCard({ product, onWishlist, onCart }: ProductCardProps) {
           </div>
         )}
       </Link>
-      <div className="grid gap-3 p-4">
+      <div className="grid flex-1 content-between gap-3 p-4">
         <div>
           <Link
             to={`/products/${product.id}`}
@@ -46,7 +46,7 @@ export function ProductCard({ product, onWishlist, onCart }: ProductCardProps) {
         </div>
         <div className="flex items-center justify-between gap-3">
           <span className="text-lg font-bold text-slate-950">{money(product.base_price)}</span>
-          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+          <span className="status-badge status-neutral">
             {product.category.name}
           </span>
         </div>

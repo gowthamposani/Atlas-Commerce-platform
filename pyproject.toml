@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["backend/tests"]
+filterwarnings = [
+  "ignore:.*crypt.*deprecated.*:DeprecationWarning:passlib.*",
+  "ignore:datetime.datetime.utcnow\\(\\).*:DeprecationWarning:jose.jwt",
+]

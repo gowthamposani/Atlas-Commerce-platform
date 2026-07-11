@@ -4,6 +4,7 @@ import { AppLayout } from "./layouts/AppLayout";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { RegisterPage } from "./pages/auth/RegisterPage";
+import { AdminDashboardPage } from "./pages/AdminDashboardPage";
 import { CartPage } from "./pages/customer/CartPage";
 import { DashboardPage } from "./pages/customer/DashboardPage";
 import { CheckoutPage } from "./pages/customer/CheckoutPage";
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/orders/:orderId" element={<OrderDetailsPage />} />
           <Route path="/orders/:orderId/confirmation" element={<OrderConfirmationPage />} />
           <Route path="/seller" element={<SellerDashboardPage />} />
+          <Route path="/admin" element={<AdminDashboardPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -8,6 +8,7 @@ import {
   PaymentTransaction,
   ProductListItem,
   ProductStatus,
+  RecommendationResponse,
   Report,
   Review,
   ReviewStatus,
@@ -135,6 +136,13 @@ export async function createPaymentIntent(orderId: string) {
 export async function getProductDescription(productId: string) {
   const response = await api.post<{ product_id: string; description: string }>(
     `/admin/ai/products/${productId}/description`,
+  );
+  return response.data;
+}
+
+export async function getProductRecommendations(productId: string) {
+  const response = await api.get<RecommendationResponse>(
+    `/admin/ai/products/${productId}/recommendations`,
   );
   return response.data;
 }

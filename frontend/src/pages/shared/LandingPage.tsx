@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 
 import { ProductCard } from "../../components/ProductCard";
 import { catalogApi } from "../../services/marketplace";
+import { optionalText } from "../../utils/validation";
 
 export function LandingPage() {
   const [search, setSearch] = useState("");
@@ -16,7 +17,10 @@ export function LandingPage() {
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    window.location.href = `/products?search=${encodeURIComponent(search)}`;
+    const cleanSearch = optionalText(search);
+    window.location.href = cleanSearch
+      ? `/products?search=${encodeURIComponent(cleanSearch)}`
+      : "/products";
   };
 
   return (

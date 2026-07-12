@@ -40,8 +40,15 @@ export function CartPage() {
                     className="field w-24"
                     type="number"
                     min={1}
+                    step={1}
                     value={item.quantity}
-                    onChange={(event) => updateMutation.mutate({ itemId: item.id, quantity: Number(event.target.value) })}
+                    onChange={(event) => {
+                      const quantity = Number(event.target.value);
+                      if (!Number.isInteger(quantity) || quantity < 1 || updateMutation.isPending) {
+                        return;
+                      }
+                      updateMutation.mutate({ itemId: item.id, quantity });
+                    }}
                   />
                   <button type="button" className="danger-button" onClick={() => removeMutation.mutate(item.id)}>
                     <Trash2 size={15} aria-hidden="true" />

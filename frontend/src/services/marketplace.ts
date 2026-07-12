@@ -4,6 +4,7 @@ import {
   CartSummary,
   Category,
   CheckoutPayload,
+  CustomerDashboard,
   InventoryItem,
   Order,
   ProductDetail,
@@ -149,6 +150,10 @@ export const cartApi = {
 };
 
 export const customerApi = {
+  async dashboard(): Promise<CustomerDashboard> {
+    const response = await api.get<CustomerDashboard>("/customer/dashboard");
+    return response.data;
+  },
   async addresses(): Promise<Address[]> {
     const response = await api.get<Address[]>("/customer/addresses");
     return response.data;

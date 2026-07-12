@@ -1,5 +1,10 @@
 from app.models.user import UserRole
 from app.schemas.customer import CustomerProfileResponse
+from app.schemas.validation import (
+    validate_optional_person_name,
+    validate_password_strength,
+    validate_phone_number,
+)
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
@@ -13,7 +18,23 @@ class RegisterRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def normalize_email(cls, value: str) -> str:
-        return value.lower()
+        return value.strip().lower()
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def validate_names(cls, value: str, info) -> str:
+        label = "First name" if info.field_name == "first_name" else "Last name"
+        return validate_optional_person_name(value, field_name=label) or ""
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        return validate_password_strength(value)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str | None) -> str | None:
+        return validate_phone_number(value)
 
 
 class LoginRequest(BaseModel):
@@ -23,7 +44,7 @@ class LoginRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def normalize_email(cls, value: str) -> str:
-        return value.lower()
+        return value.strip().lower()
 
 
 class RefreshRequest(BaseModel):

@@ -181,3 +181,112 @@ def test_marketplace_shopping_order_flow(client: TestClient) -> None:
     )
     assert cancel_response.status_code == 200
     assert cancel_response.json()["status"] == "cancelled"
+
+
+def test_marketplace_validation_rejects_bad_product_inventory_and_filters(
+    client: TestClient,
+) -> None:
+    tokens = register_and_login(client, "validation-market@example.com")
+    headers = auth_headers(str(tokens["access_token"]))
+
+    blank_category = client.post(
+        "/api/catalog/categories",
+        headers=headers,
+        json={"name": "   "},
+    )
+    assert blank_category.status_code == 422
+
+    category_response = client.post(
+        "/api/catalog/categories",
+        headers=headers,
+        json={"name": "Validation Gear"},
+    )
+    assert category_response.status_code == 201
+    category_id = category_response.json()["id"]
+
+    seller_response = client.post(
+        "/api/seller/profile",
+        headers=headers,
+        json={"store_name": "Validation Store"},
+    )
+    assert seller_response.status_code == 201
+
+    bad_product = client.post(
+        "/api/seller/products",
+        headers=headers,
+        json={
+            "category_id": category_id,
+            "name": "Bad Product",
+            "description": "Invalid product payload",
+            "base_price": -1,
+            "status": "active",
+            "images": [{"url": "javascript:alert(1)"}],
+            "variants": [{"sku": "bad sku", "name": "Standard", "price_delta": 0}],
+        },
+    )
+    assert bad_product.status_code == 422
+
+    duplicate_skus = client.post(
+        "/api/seller/products",
+        headers=headers,
+        json={
+            "category_id": category_id,
+            "name": "Duplicate SKU Product",
+            "description": "Duplicate SKU payload",
+            "base_price": 19.99,
+            "status": "active",
+            "images": [],
+            "variants": [
+                {"sku": "DUP-001", "name": "One", "price_delta": 0},
+                {"sku": "DUP-001", "name": "Two", "price_delta": 0},
+            ],
+        },
+    )
+    assert duplicate_skus.status_code == 422
+
+    product_response = client.post(
+        "/api/seller/products",
+        headers=headers,
+        json={
+            "category_id": category_id,
+            "name": "Valid Product",
+            "description": "Valid product payload",
+            "base_price": 19.99,
+            "status": "active",
+            "images": [],
+            "variants": [{"sku": "VALID-001", "name": "Standard", "price_delta": 0}],
+        },
+    )
+    assert product_response.status_code == 201
+
+    warehouse_response = client.post(
+        "/api/inventory/warehouses",
+        headers=headers,
+        json={
+            "name": "Validation Warehouse",
+            "code": "VAL-WH-1",
+            "city": "Austin",
+            "state": "TX",
+            "country": "US",
+        },
+    )
+    assert warehouse_response.status_code == 201
+
+    invalid_stock = client.post(
+        "/api/inventory/stock",
+        headers=headers,
+        json={
+            "product_id": product_response.json()["id"],
+            "warehouse_id": warehouse_response.json()["id"],
+            "quantity": 1,
+            "reserved_quantity": 2,
+            "reorder_level": 1,
+        },
+    )
+    assert invalid_stock.status_code == 422
+
+    reversed_filter = client.get(
+        "/api/catalog/products",
+        params={"min_price": 100, "max_price": 10},
+    )
+    assert reversed_filter.status_code == 400

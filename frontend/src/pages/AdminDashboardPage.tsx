@@ -133,25 +133,102 @@ export function AdminDashboardPage() {
 
 function OverviewPanel() {
   const dashboardQuery = useQuery({ queryKey: ["admin", "dashboard"], queryFn: getAdminDashboard });
+  const dashboard = dashboardQuery.data;
   const stats = dashboardQuery.data?.stats;
   const tiles: Array<[string, string | number, LucideIcon]> = [
     ["Customers", stats?.total_customers ?? 0, Users],
     ["Sellers", stats?.total_sellers ?? 0, ShieldCheck],
+    ["Categories", stats?.total_categories ?? 0, FileText],
     ["Products", stats?.total_products ?? 0, PackageCheck],
     ["Orders", stats?.total_orders ?? 0, FileText],
-    ["Revenue", money(stats?.revenue_summary ?? 0), CreditCard],
+    ["Revenue", money(stats?.revenue ?? stats?.revenue_summary ?? 0), CreditCard],
     ["Pending Orders", stats?.pending_orders ?? 0, Truck],
+    ["Pending Sellers", stats?.pending_seller_approvals ?? 0, ShieldCheck],
+    ["Pending Products", stats?.pending_products ?? dashboard?.pending_products ?? 0, EyeOff],
+    ["Pending Reviews", stats?.pending_reviews ?? dashboard?.pending_reviews ?? 0, Star],
+    ["Inventory Alerts", stats?.inventory_alerts ?? dashboard?.inventory_alerts ?? 0, PackageCheck],
   ];
 
+  if (dashboardQuery.isLoading) {
+    return (
+      <div className="surface-card flex items-center gap-3 text-sm text-slate-600">
+        <span className="loading-spinner" aria-hidden="true" />
+        Loading dashboard metrics...
+      </div>
+    );
+  }
+
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {tiles.map(([label, value, Icon]) => (
-        <div className="rounded-md border border-slate-200 bg-white p-4" key={label}>
-          <Icon className="h-5 w-5 text-teal-700" />
-          <p className="mt-3 text-sm text-slate-500">{label}</p>
-          <p className="text-2xl font-semibold text-slate-950">{value}</p>
+    <div className="grid gap-6">
+      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
+        {tiles.map(([label, value, Icon]) => (
+          <div className="surface-card" key={label}>
+            <Icon className="h-5 w-5 text-teal-700" />
+            <p className="mt-3 text-sm text-slate-500">{label}</p>
+            <p className="text-2xl font-semibold text-slate-950">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="surface-card">
+          <h2 className="text-lg font-semibold text-slate-950">Top Selling Products</h2>
+          <div className="mt-4 grid gap-3">
+            {dashboard?.top_selling_products.map((item) => (
+              <div key={item.product_id} className="rounded-md border border-slate-200 p-3">
+                <p className="font-semibold text-slate-950">{item.name}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {item.units_sold} units sold · {money(item.revenue)}
+                </p>
+              </div>
+            ))}
+            {!dashboard?.top_selling_products.length && (
+              <p className="empty-state">
+                Top products appear after orders are placed.
+              </p>
+            )}
+          </div>
         </div>
-      ))}
+
+        <div className="surface-card">
+          <h2 className="text-lg font-semibold text-slate-950">Top Sellers</h2>
+          <div className="mt-4 grid gap-3">
+            {dashboard?.top_sellers.map((seller) => (
+              <div key={seller.seller_id} className="rounded-md border border-slate-200 p-3">
+                <p className="font-semibold text-slate-950">{seller.store_name}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {seller.orders} orders · {money(seller.revenue)}
+                </p>
+              </div>
+            ))}
+            {!dashboard?.top_sellers.length && (
+              <p className="empty-state">
+                Top sellers appear after marketplace orders are placed.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="surface-card">
+          <h2 className="text-lg font-semibold text-slate-950">Recent Orders</h2>
+          <div className="mt-4 grid gap-3">
+            {dashboard?.recent_orders.map((order) => (
+              <div key={order.id} className="rounded-md border border-slate-200 p-3">
+                <p className="font-semibold text-slate-950">{order.order_number}</p>
+                <div className="mt-2 flex items-center justify-between gap-3 text-sm text-slate-600">
+                  <StatusBadge value={order.status} />
+                  <span className="font-semibold text-slate-900">{money(order.total_amount)}</span>
+                </div>
+              </div>
+            ))}
+            {!dashboard?.recent_orders.length && (
+              <p className="empty-state">
+                Recent orders appear after checkout activity.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -169,7 +246,7 @@ function UsersPanel() {
       rows={(usersQuery.data ?? []).map((item: AdminUser) => [
         item.email,
         item.role,
-        item.is_active ? "Active" : "Suspended",
+        <StatusBadge key={`${item.id}-status`} value={item.is_active ? "active" : "suspended"} />,
         <button
           className={item.is_active ? "danger-button" : "secondary-button"}
           key={item.id}
@@ -197,8 +274,8 @@ function SellersPanel() {
       columns={["Store", "Status", "Active", "Actions"]}
       rows={(sellersQuery.data ?? []).map((seller: Seller) => [
         seller.store_name,
-        seller.moderation_status,
-        seller.is_active ? "Yes" : "No",
+        <StatusBadge key={`${seller.id}-moderation`} value={seller.moderation_status} />,
+        <StatusBadge key={`${seller.id}-active`} value={seller.is_active ? "active" : "inactive"} />,
         <div className="flex flex-wrap gap-2" key={seller.id}>
           <button className="secondary-button" onClick={() => mutation.mutate({ id: seller.id, status: "approved" })} type="button">
             <CheckCircle2 className="h-4 w-4" /> Approve
@@ -225,9 +302,9 @@ function ProductsPanel() {
       columns={["Product", "Status", "Visible", "Featured", "Actions"]}
       rows={(productsQuery.data ?? []).map((product: ProductListItem) => [
         product.name,
-        product.status,
-        product.is_visible ? "Yes" : "No",
-        product.is_featured ? "Yes" : "No",
+        <StatusBadge key={`${product.id}-status`} value={product.status} />,
+        <StatusBadge key={`${product.id}-visible`} value={product.is_visible ? "visible" : "hidden"} />,
+        <StatusBadge key={`${product.id}-featured`} value={product.is_featured ? "featured" : "standard"} />,
         <div className="flex flex-wrap gap-2" key={product.id}>
           <button className="secondary-button" onClick={() => mutation.mutate({ id: product.id, payload: { status: "active", is_visible: true } })} type="button">
             <CheckCircle2 className="h-4 w-4" /> Approve
@@ -264,9 +341,9 @@ function OrdersPanel() {
       columns={["Order", "Status", "Total", "Shipment", "Actions"]}
       rows={(ordersQuery.data ?? []).map((order: Order) => [
         order.order_number,
-        order.status,
+        <StatusBadge key={`${order.id}-status`} value={order.status} />,
         money(order.total_amount),
-        order.tracking_number ?? order.shipment_status,
+        order.tracking_number ?? <StatusBadge key={`${order.id}-shipment`} value={order.shipment_status} />,
         <div className="flex flex-wrap gap-2" key={order.id}>
           <button className="secondary-button" onClick={() => statusMutation.mutate({ id: order.id, status: "shipped" })} type="button">
             <Truck className="h-4 w-4" /> Ship
@@ -297,7 +374,7 @@ function ReviewsPanel() {
       rows={(reviewsQuery.data ?? []).map((review: Review) => [
         review.rating,
         review.title ?? review.body,
-        review.status,
+        <StatusBadge key={`${review.id}-status`} value={review.status} />,
         <div className="flex gap-2" key={review.id}>
           <button className="secondary-button" onClick={() => mutation.mutate({ id: review.id, status: "approved" })} type="button">
             Approve
@@ -378,9 +455,9 @@ function PaymentsPanel() {
       <DataTable
         columns={["Reference", "Amount", "Status", "Actions"]}
         rows={(paymentsQuery.data ?? []).map((payment: PaymentTransaction) => [
-          payment.provider_reference,
-          money(payment.amount),
-          payment.status,
+        payment.provider_reference,
+        money(payment.amount),
+          <StatusBadge key={`${payment.id}-status`} value={payment.status} />,
           <button className="secondary-button" key={payment.id} onClick={() => updateMutation.mutate({ id: payment.id, status: "succeeded" })} type="button">
             Mark Success
           </button>,
@@ -420,7 +497,7 @@ function AiPanel() {
 
 function DataTable({ columns, rows }: { columns: string[]; rows: Array<Array<ReactNode>> }) {
   return (
-    <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] border-collapse text-left text-sm">
           <thead className="bg-slate-50 text-slate-600">
@@ -434,7 +511,7 @@ function DataTable({ columns, rows }: { columns: string[]; rows: Array<Array<Rea
           </thead>
           <tbody>
             {rows.map((row, rowIndex) => (
-              <tr className="border-b border-slate-100 last:border-0" key={rowIndex}>
+              <tr className="border-b border-slate-100 transition hover:bg-slate-50 last:border-0" key={rowIndex}>
                 {row.map((cell, cellIndex) => (
                   <td className="px-4 py-3 align-top text-slate-700" key={`${rowIndex}-${cellIndex}`}>
                     {cell}
@@ -445,7 +522,7 @@ function DataTable({ columns, rows }: { columns: string[]; rows: Array<Array<Rea
             {rows.length === 0 && (
               <tr>
                 <td className="px-4 py-6 text-center text-slate-500" colSpan={columns.length}>
-                  No records available.
+                  No records available for this view.
                 </td>
               </tr>
             )}
@@ -454,4 +531,23 @@ function DataTable({ columns, rows }: { columns: string[]; rows: Array<Array<Rea
       </div>
     </div>
   );
+}
+
+function StatusBadge({ value }: { value: string }) {
+  const normalized = value.replace(/_/g, " ");
+  return <span className={`status-badge ${statusClass(value)}`}>{normalized}</span>;
+}
+
+function statusClass(value: string) {
+  const status = value.toLowerCase();
+  if (["active", "approved", "succeeded", "delivered", "visible", "featured"].includes(status)) {
+    return "status-success";
+  }
+  if (["pending", "draft", "packed", "shipped", "label_created", "standard"].includes(status)) {
+    return "status-warning";
+  }
+  if (["suspended", "rejected", "failed", "deleted", "cancelled", "refunded", "hidden"].includes(status)) {
+    return "status-danger";
+  }
+  return "status-neutral";
 }

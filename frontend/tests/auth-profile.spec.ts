@@ -13,7 +13,10 @@ test("landing to register, login, profile update, and logout", async ({ page }) 
   await page.getByLabel("Last name").fill("Morgan");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("S3curePass!");
-  await page.getByLabel("Phone").fill("555-0123");
+  await page.getByLabel("Phone").fill("phone-number");
+  await page.getByRole("button", { name: "Register" }).click();
+  await expect(page.getByText("Phone number must contain 10 to 15 digits")).toBeVisible();
+  await page.getByLabel("Phone").fill("5550123456");
   await page.getByRole("button", { name: "Register" }).click();
 
   await expect(page.getByRole("heading", { name: "Login" })).toBeVisible();
@@ -28,7 +31,7 @@ test("landing to register, login, profile update, and logout", async ({ page }) 
 
   await expect(page.getByRole("heading", { name: "Customer profile" })).toBeVisible();
   await page.getByLabel("First name").fill("Jordyn");
-  await page.getByLabel("Phone").fill("555-0198");
+  await page.getByLabel("Phone").fill("5550198000");
   await page.getByRole("button", { name: "Save profile" }).click();
   await expect(page.getByText("Profile updated.")).toBeVisible();
 

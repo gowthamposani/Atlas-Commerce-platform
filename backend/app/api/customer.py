@@ -7,6 +7,7 @@ from app.schemas.customer import (
     AddressCreate,
     AddressResponse,
     AddressUpdate,
+    CustomerDashboardResponse,
     CustomerProfileResponse,
     CustomerProfileUpdate,
 )
@@ -26,6 +27,14 @@ def get_profile(
     current_user: CustomerUser,
 ) -> CustomerProfileResponse:
     return CustomerService(db).get_profile(current_user.id)
+
+
+@router.get("/dashboard", response_model=CustomerDashboardResponse)
+def get_dashboard(
+    db: DbSession,
+    current_user: CustomerUser,
+) -> CustomerDashboardResponse:
+    return CustomerService(db).dashboard(current_user.id)
 
 
 @router.put("/profile", response_model=CustomerProfileResponse)

@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { LoginPayload } from "../../types/api";
+import { trimmed } from "../../utils/validation";
 
 export function LoginPage() {
   const auth = useAuth();
@@ -25,7 +26,8 @@ export function LoginPage() {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    mutation.mutate(form);
+    if (mutation.isPending) return;
+    mutation.mutate({ email: trimmed(form.email).toLowerCase(), password: form.password });
   };
 
   return (

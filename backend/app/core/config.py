@@ -28,6 +28,8 @@ class Settings(BaseSettings):
         default=7,
         validation_alias="REFRESH_TOKEN_EXPIRE_DAYS",
     )
+    phone_min_digits: int = Field(default=10, validation_alias="PHONE_MIN_DIGITS")
+    phone_max_digits: int = Field(default=15, validation_alias="PHONE_MAX_DIGITS")
 
     cors_origins: list[str] = Field(
         default=[

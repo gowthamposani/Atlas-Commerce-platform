@@ -15,6 +15,7 @@ from app.models.marketplace import (
     OrderStatus,
     Product,
     ProductStatus,
+    ProductVariant,
     SellerProfile,
     Warehouse,
     WishlistItem,
@@ -45,13 +46,15 @@ from app.schemas.marketplace import (
     ProductUpdate,
     SellerCreate,
     SellerDashboardResponse,
+    SellerTopProductResponse,
     SellerUpdate,
     WarehouseCreate,
     WarehouseUpdate,
     WishlistAdd,
 )
 from app.utils.slug import slugify
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, selectinload
 
 Money = Decimal
 
@@ -185,12 +188,70 @@ class SellerService:
         product_count, active_count, total_stock, order_count = self.sellers.dashboard_counts(
             seller.id,
         )
+        revenue = self.db.scalar(
+            select(func.coalesce(func.sum(OrderItem.line_total), 0)).where(
+                OrderItem.seller_id == seller.id,
+            ),
+        )
+        low_stock_count = int(
+            self.db.scalar(
+                select(func.count(InventoryItem.id))
+                .join(Product, Product.id == InventoryItem.product_id)
+                .where(
+                    Product.seller_id == seller.id,
+                    InventoryItem.quantity <= InventoryItem.reorder_level,
+                ),
+            )
+            or 0,
+        )
+        recent_order_ids = (
+            select(Order.id)
+            .join(OrderItem, OrderItem.order_id == Order.id)
+            .where(OrderItem.seller_id == seller.id)
+            .group_by(Order.id)
+            .order_by(func.max(Order.created_at).desc())
+            .limit(5)
+            .subquery()
+        )
+        recent_orders = list(
+            self.db.scalars(
+                select(Order)
+                .options(selectinload(Order.items))
+                .join(recent_order_ids, recent_order_ids.c.id == Order.id)
+                .order_by(Order.created_at.desc()),
+            ),
+        )
+        top_products = [
+            SellerTopProductResponse(
+                product_id=str(row.product_id),
+                name=str(row.product_name),
+                units_sold=int(row.units_sold or 0),
+                revenue=float(row.revenue or 0),
+            )
+            for row in self.db.execute(
+                select(
+                    OrderItem.product_id.label("product_id"),
+                    OrderItem.product_name.label("product_name"),
+                    func.coalesce(func.sum(OrderItem.quantity), 0).label("units_sold"),
+                    func.coalesce(func.sum(OrderItem.line_total), 0).label("revenue"),
+                )
+                .where(OrderItem.seller_id == seller.id)
+                .group_by(OrderItem.product_id, OrderItem.product_name)
+                .order_by(func.sum(OrderItem.quantity).desc())
+                .limit(5),
+            )
+        ]
         return SellerDashboardResponse(
             seller=seller,
             product_count=product_count,
             active_product_count=active_count,
             total_stock=total_stock,
             order_count=order_count,
+            revenue=float(revenue or 0),
+            low_stock_count=low_stock_count,
+            inventory_alerts=low_stock_count,
+            recent_orders=[OrderResponse.model_validate(order) for order in recent_orders],
+            top_products=top_products,
         )
 
     def public_store(self, seller_id: str) -> SellerProfile:
@@ -208,6 +269,7 @@ class SellerService:
         category = self.catalog.get_category(payload.category_id)
         if category is None or not category.is_active:
             raise bad_request("A valid active category is required")
+        self._ensure_variant_skus_available(payload.variants)
         slug = unique_slug(payload.name, lambda value: self.catalog.slug_exists(Product, value))
         data = payload.model_dump(exclude={"images", "variants"})
         data["base_price"] = to_money(data["base_price"])
@@ -242,6 +304,8 @@ class SellerService:
             )
         if "base_price" in data:
             data["base_price"] = to_money(data["base_price"])
+        if payload.variants is not None:
+            self._ensure_variant_skus_available(payload.variants, product_id=product.id)
         for field, value in data.items():
             setattr(product, field, value)
         self.sellers.replace_product_media(
@@ -263,6 +327,19 @@ class SellerService:
         if refreshed is None:
             raise not_found("Product was not found")
         return refreshed
+
+    def _ensure_variant_skus_available(
+        self,
+        variants,
+        *,
+        product_id: str | None = None,
+    ) -> None:
+        for variant in variants:
+            existing_product_id = self.db.scalar(
+                select(ProductVariant.product_id).where(ProductVariant.sku == variant.sku),
+            )
+            if existing_product_id is not None and existing_product_id != product_id:
+                raise bad_request(f"SKU {variant.sku} is already in use")
 
     def delete_product(self, *, user_id: str, product_id: str) -> None:
         seller = self.require_seller(user_id)

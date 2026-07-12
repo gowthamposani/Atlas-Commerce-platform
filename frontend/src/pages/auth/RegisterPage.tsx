@@ -4,6 +4,15 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { RegisterPayload } from "../../types/api";
+import {
+  PHONE_MESSAGE,
+  firstError,
+  optionalText,
+  trimmed,
+  validatePassword,
+  validatePersonName,
+  validatePhone,
+} from "../../utils/validation";
 
 const initialForm: RegisterPayload = {
   email: "",
@@ -38,9 +47,23 @@ export function RegisterPage() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (mutation.isPending) return;
+    const validationError = firstError(
+      validatePersonName(form.first_name, "First name"),
+      validatePersonName(form.last_name, "Last name"),
+      validatePassword(form.password),
+      validatePhone(form.phone),
+    );
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     const payload = {
-      ...form,
-      phone: form.phone?.trim() || undefined,
+      email: trimmed(form.email).toLowerCase(),
+      password: form.password,
+      first_name: trimmed(form.first_name),
+      last_name: trimmed(form.last_name),
+      phone: optionalText(form.phone),
     };
     mutation.mutate(payload);
   };
@@ -57,7 +80,7 @@ export function RegisterPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-md border border-slate-200 bg-white p-6 shadow-sm">
+      <form onSubmit={handleSubmit} className="rounded-md border border-slate-200 bg-white p-6 shadow-sm" noValidate>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="grid gap-1">
             <span className="label">First name</span>
@@ -109,6 +132,9 @@ export function RegisterPage() {
               name="phone"
               value={form.phone}
               onChange={(event) => updateField("phone", event.target.value)}
+              inputMode="tel"
+              pattern="^\+?\d{10,15}$"
+              title={PHONE_MESSAGE}
             />
           </label>
         </div>

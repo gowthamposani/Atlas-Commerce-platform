@@ -82,12 +82,31 @@ class AdminService:
             recent_orders=[OrderResponse.model_validate(order) for order in recent_orders],
             pending_sellers=pending_sellers,
             pending_products=pending_products,
+            pending_reviews=self._count(
+                ProductReview,
+                ProductReview.status == ReviewStatus.PENDING,
+            ),
+            inventory_alerts=self._inventory_alerts(),
+            top_selling_products=self._top_selling_products(),
+            top_sellers=self._top_sellers(),
         )
 
     def stats(self) -> AdminStatsResponse:
-        total_customers = self._count(User, User.role == UserRole.CUSTOMER)
+        seller_user_exists = (
+            select(SellerProfile.id).where(SellerProfile.user_id == User.id).exists()
+        )
+        total_customers = int(
+            self.db.scalar(
+                select(func.count(User.id)).where(
+                    User.role == UserRole.CUSTOMER,
+                    ~seller_user_exists,
+                ),
+            )
+            or 0,
+        )
         total_sellers = self._count(SellerProfile)
         total_products = self._count(Product)
+        total_categories = self._count(Category)
         total_orders = self._count(Order)
         revenue = self.db.scalar(
             select(func.coalesce(func.sum(Order.total_amount), 0)).where(
@@ -100,20 +119,28 @@ class AdminService:
             SellerProfile,
             SellerProfile.moderation_status == SellerModerationStatus.PENDING,
         )
+        pending_products = self._count(Product, Product.status == ProductStatus.DRAFT)
+        pending_reviews = self._count(ProductReview, ProductReview.status == ReviewStatus.PENDING)
         return AdminStatsResponse(
             total_customers=total_customers,
             total_sellers=total_sellers,
             total_products=total_products,
+            total_categories=total_categories,
             total_orders=total_orders,
+            revenue=float(revenue or 0),
             revenue_summary=float(revenue or 0),
             pending_orders=pending_orders,
             pending_seller_approvals=pending_sellers,
+            pending_products=pending_products,
+            pending_reviews=pending_reviews,
+            inventory_alerts=self._inventory_alerts(),
         )
 
     def list_users(self, search: str | None = None) -> list[User]:
         statement = select(User).order_by(User.created_at.desc())
-        if search:
-            statement = statement.where(func.lower(User.email).like(f"%{search.lower()}%"))
+        normalized_search = search.strip().lower() if search else None
+        if normalized_search:
+            statement = statement.where(func.lower(User.email).like(f"%{normalized_search}%"))
         return list(self.db.scalars(statement))
 
     def update_user_status(self, user_id: str, payload: UserStatusUpdate, actor_id: str) -> User:
@@ -406,6 +433,61 @@ class AdminService:
     def list_shipments(self) -> list[Shipment]:
         return list(self.db.scalars(select(Shipment).order_by(Shipment.created_at.desc())))
 
+    def _inventory_alerts(self) -> int:
+        return int(
+            self.db.scalar(
+                select(func.count(InventoryItem.id)).where(
+                    InventoryItem.quantity <= InventoryItem.reorder_level,
+                ),
+            )
+            or 0,
+        )
+
+    def _top_selling_products(self) -> list[dict[str, str | int | float]]:
+        rows = self.db.execute(
+            select(
+                OrderItem.product_id,
+                OrderItem.product_name,
+                func.coalesce(func.sum(OrderItem.quantity), 0).label("units_sold"),
+                func.coalesce(func.sum(OrderItem.line_total), 0).label("revenue"),
+            )
+            .group_by(OrderItem.product_id, OrderItem.product_name)
+            .order_by(func.sum(OrderItem.quantity).desc())
+            .limit(5),
+        )
+        return [
+            {
+                "product_id": str(row.product_id),
+                "name": str(row.product_name),
+                "units_sold": int(row.units_sold or 0),
+                "revenue": float(row.revenue or 0),
+            }
+            for row in rows
+        ]
+
+    def _top_sellers(self) -> list[dict[str, str | int | float]]:
+        rows = self.db.execute(
+            select(
+                SellerProfile.id.label("seller_id"),
+                SellerProfile.store_name,
+                func.coalesce(func.count(func.distinct(OrderItem.order_id)), 0).label("orders"),
+                func.coalesce(func.sum(OrderItem.line_total), 0).label("revenue"),
+            )
+            .join(OrderItem, OrderItem.seller_id == SellerProfile.id)
+            .group_by(SellerProfile.id, SellerProfile.store_name)
+            .order_by(func.sum(OrderItem.line_total).desc())
+            .limit(5),
+        )
+        return [
+            {
+                "seller_id": str(row.seller_id),
+                "store_name": str(row.store_name),
+                "orders": int(row.orders or 0),
+                "revenue": float(row.revenue or 0),
+            }
+            for row in rows
+        ]
+
     def recommendations(self, product_id: str) -> RecommendationResponse:
         product = self._product(product_id)
         statement = (
@@ -497,7 +579,14 @@ class AdminService:
 
     def _count(
         self,
-        model: type[User] | type[SellerProfile] | type[Product] | type[Order] | type[ProductReview],
+        model: (
+            type[User]
+            | type[SellerProfile]
+            | type[Product]
+            | type[Order]
+            | type[ProductReview]
+            | type[Category]
+        ),
         *filters: object,
     ) -> int:
         statement = select(func.count(model.id))

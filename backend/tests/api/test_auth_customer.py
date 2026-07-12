@@ -9,7 +9,7 @@ def register_customer(client: TestClient, email: str = "pat@example.com") -> dic
             "password": "S3curePass!",
             "first_name": "Pat",
             "last_name": "Rivera",
-            "phone": "555-0100",
+            "phone": "5550100100",
         },
     )
     assert response.status_code == 201
@@ -84,11 +84,11 @@ def test_customer_profile_and_address_management(client: TestClient) -> None:
     updated_profile = client.put(
         "/api/customer/profile",
         headers=headers,
-        json={"first_name": "Avery", "phone": "555-0199"},
+        json={"first_name": "Avery", "phone": "5550199000"},
     )
     assert updated_profile.status_code == 200
     assert updated_profile.json()["first_name"] == "Avery"
-    assert updated_profile.json()["phone"] == "555-0199"
+    assert updated_profile.json()["phone"] == "5550199000"
 
     first_address = client.post(
         "/api/customer/addresses",
@@ -147,3 +147,69 @@ def test_customer_profile_and_address_management(client: TestClient) -> None:
 
     remaining = client.get("/api/customer/addresses", headers=headers)
     assert len(remaining.json()) == 1
+
+
+def test_customer_validation_rejects_invalid_phone_password_and_names(
+    client: TestClient,
+) -> None:
+    weak_password = client.post(
+        "/api/auth/register",
+        json={
+            "email": "weak@example.com",
+            "password": "password",
+            "first_name": "Pat",
+            "last_name": "Rivera",
+        },
+    )
+    assert weak_password.status_code == 422
+
+    invalid_phone = client.post(
+        "/api/auth/register",
+        json={
+            "email": "bad-phone@example.com",
+            "password": "S3curePass!",
+            "first_name": "Pat",
+            "last_name": "Rivera",
+            "phone": "555-ABCD",
+        },
+    )
+    assert invalid_phone.status_code == 422
+
+    invalid_name = client.post(
+        "/api/auth/register",
+        json={
+            "email": "bad-name@example.com",
+            "password": "S3curePass!",
+            "first_name": "Pat2",
+            "last_name": "Rivera",
+        },
+    )
+    assert invalid_name.status_code == 422
+
+    register_customer(client, email="validations@example.com")
+    tokens = login_customer(client, email="validations@example.com")
+    headers = auth_headers(str(tokens["access_token"]))
+
+    invalid_profile_phone = client.put(
+        "/api/customer/profile",
+        headers=headers,
+        json={"phone": "letters"},
+    )
+    assert invalid_profile_phone.status_code == 422
+
+    invalid_address = client.post(
+        "/api/customer/addresses",
+        headers=headers,
+        json={
+            "label": "Home",
+            "recipient_name": "Avery2 Rivera",
+            "line1": "100 Market Street",
+            "city": "Austin",
+            "state": "TX",
+            "postal_code": "ABC",
+            "country": "US",
+            "phone": "555 010 0100",
+            "is_default_shipping": True,
+        },
+    )
+    assert invalid_address.status_code == 422

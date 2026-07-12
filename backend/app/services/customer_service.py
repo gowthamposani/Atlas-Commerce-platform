@@ -1,9 +1,17 @@
 from app.core.exceptions import not_found
 from app.models.address import Address
 from app.models.customer_profile import CustomerProfile
+from app.models.marketplace import CartItem, Order, WishlistItem
 from app.repositories.customer_repository import CustomerRepository
-from app.schemas.customer import AddressCreate, AddressUpdate, CustomerProfileUpdate
-from sqlalchemy.orm import Session
+from app.schemas.customer import (
+    AddressCreate,
+    AddressUpdate,
+    CustomerDashboardResponse,
+    CustomerProfileUpdate,
+)
+from app.schemas.marketplace import OrderResponse
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, selectinload
 
 
 class CustomerService:
@@ -27,6 +35,40 @@ class CustomerService:
 
     def list_addresses(self, user_id: str) -> list[Address]:
         return self.customers.list_addresses(user_id)
+
+    def dashboard(self, user_id: str) -> CustomerDashboardResponse:
+        total_orders = int(
+            self.db.scalar(select(func.count(Order.id)).where(Order.user_id == user_id)) or 0,
+        )
+        wishlist_items = int(
+            self.db.scalar(
+                select(func.count(WishlistItem.id)).where(WishlistItem.user_id == user_id),
+            )
+            or 0,
+        )
+        cart_items = int(
+            self.db.scalar(
+                select(func.coalesce(func.sum(CartItem.quantity), 0)).where(
+                    CartItem.user_id == user_id,
+                ),
+            )
+            or 0,
+        )
+        recent_orders = list(
+            self.db.scalars(
+                select(Order)
+                .options(selectinload(Order.items))
+                .where(Order.user_id == user_id)
+                .order_by(Order.created_at.desc())
+                .limit(5),
+            ),
+        )
+        return CustomerDashboardResponse(
+            total_orders=total_orders,
+            wishlist_items=wishlist_items,
+            cart_items=cart_items,
+            recent_orders=[OrderResponse.model_validate(order) for order in recent_orders],
+        )
 
     def create_address(self, *, user_id: str, payload: AddressCreate) -> Address:
         data = payload.model_dump()

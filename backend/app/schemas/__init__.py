@@ -10,6 +10,7 @@ from app.schemas.customer import (
     AddressCreate,
     AddressResponse,
     AddressUpdate,
+    CustomerDashboardResponse,
     CustomerProfileResponse,
     CustomerProfileUpdate,
 )
@@ -64,6 +65,7 @@ __all__ = [
     "CategoryUpdate",
     "CheckoutCreate",
     "CurrentUserResponse",
+    "CustomerDashboardResponse",
     "CustomerProfileResponse",
     "CustomerProfileUpdate",
     "InventoryResponse",

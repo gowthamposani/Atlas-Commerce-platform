@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from app.core.dependencies import get_current_user
+from app.core.exceptions import bad_request
 from app.database.session import get_db
 from app.models.user import User
 from app.schemas.marketplace import (
@@ -61,7 +62,7 @@ def delete_category(
 @router.get("/products", response_model=ProductPageResponse)
 def search_products(
     db: DbSession,
-    search: str | None = None,
+    search: str | None = Query(default=None, max_length=120),
     category_id: str | None = None,
     seller_id: str | None = None,
     min_price: float | None = Query(default=None, ge=0),
@@ -69,8 +70,13 @@ def search_products(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=12, ge=1, le=100),
 ) -> ProductPageResponse:
+    normalized_search = search.strip() if search is not None else None
+    if normalized_search == "":
+        normalized_search = None
+    if min_price is not None and max_price is not None and min_price > max_price:
+        raise bad_request("Minimum price cannot exceed maximum price")
     return CatalogService(db).search_products(
-        search=search,
+        search=normalized_search,
         category_id=category_id,
         seller_id=seller_id,
         min_price=min_price,

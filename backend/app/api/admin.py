@@ -185,11 +185,6 @@ def moderate_review(
     return AdminService(db).moderate_review(review_id, payload, current_user.id)
 
 
-@router.get("/reports/{name}", response_model=ReportResponse)
-def report(name: str, db: DbSession, _: AdminUser) -> ReportResponse:
-    return AdminService(db).report(name)
-
-
 @router.get("/reports/{name}.csv")
 def report_csv(name: str, db: DbSession, _: AdminUser) -> Response:
     return Response(AdminService(db).report_csv(name), media_type="text/csv")
@@ -198,6 +193,11 @@ def report_csv(name: str, db: DbSession, _: AdminUser) -> Response:
 @router.get("/reports/{name}.pdf")
 def report_pdf(name: str, db: DbSession, _: AdminUser) -> Response:
     return Response(AdminService(db).report_pdf_placeholder(name), media_type="application/pdf")
+
+
+@router.get("/reports/{name}", response_model=ReportResponse)
+def report(name: str, db: DbSession, _: AdminUser) -> ReportResponse:
+    return AdminService(db).report(name)
 
 
 @router.get("/notifications", response_model=list[NotificationResponse])

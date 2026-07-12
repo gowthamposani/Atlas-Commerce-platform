@@ -15,7 +15,7 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-[#f7f8fb] text-slate-900">
       <header className="border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <Link to="/" className="inline-flex items-center gap-2 font-semibold text-slate-950">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-teal-700 text-white">
               <ShoppingBag size={19} aria-hidden="true" />
@@ -23,7 +23,7 @@ export function AppLayout() {
             <span>Atlas Commerce</span>
           </Link>
 
-          <nav className="flex items-center gap-2">
+          <nav className="flex flex-wrap items-center justify-end gap-2">
             {auth.isAuthenticated ? (
               <>
                 <NavLink

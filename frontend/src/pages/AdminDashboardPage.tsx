@@ -34,6 +34,7 @@ import {
   getPayments,
   getProductDescription,
   getReport,
+  getReportCsv,
   moderateProduct,
   moderateReview,
   moderateSeller,
@@ -390,7 +391,24 @@ function ReviewsPanel() {
 
 function ReportsPanel() {
   const [name, setName] = useState("sales");
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const reportQuery = useQuery({ queryKey: ["admin", "report", name], queryFn: () => getReport(name) });
+  const csvMutation = useMutation({
+    mutationFn: getReportCsv,
+    onSuccess: (csv, reportName) => {
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `atlas-${reportName}-report.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setDownloadError(null);
+    },
+    onError: () => setDownloadError("CSV download failed. Try again."),
+  });
   const rows = reportQuery.data?.rows ?? [];
   const columns = useMemo(() => (rows[0] ? Object.keys(rows[0]) : ["Report"]), [rows]);
   return (
@@ -401,10 +419,16 @@ function ReportsPanel() {
             <FileText className="h-4 w-4" /> {report}
           </button>
         ))}
-        <a className="secondary-button" href={`/api/admin/reports/${name}.csv`}>
+        <button
+          className="secondary-button"
+          disabled={csvMutation.isPending}
+          onClick={() => csvMutation.mutate(name)}
+          type="button"
+        >
           <Download className="h-4 w-4" /> CSV
-        </a>
+        </button>
       </div>
+      {downloadError ? <p className="text-sm font-medium text-red-700">{downloadError}</p> : null}
       <DataTable columns={columns} rows={rows.map((row) => columns.map((column) => String(row[column] ?? "")))} />
     </div>
   );

@@ -102,6 +102,13 @@ export async function getReport(name: string) {
   return response.data;
 }
 
+export async function getReportCsv(name: string) {
+  const response = await api.get<string>(`/admin/reports/${name}.csv`, {
+    responseType: "text",
+  });
+  return response.data;
+}
+
 export async function getNotifications() {
   const response = await api.get<NotificationItem[]>("/admin/notifications");
   return response.data;

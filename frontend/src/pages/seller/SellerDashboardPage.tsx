@@ -55,11 +55,13 @@ export function SellerDashboardPage() {
   const warehousesQuery = useQuery({
     queryKey: ["seller", "warehouses"],
     queryFn: inventoryApi.warehouses,
+    enabled: dashboardQuery.isSuccess,
     retry: false,
   });
   const productsQuery = useQuery({
     queryKey: ["seller", "products"],
     queryFn: sellerApi.products,
+    enabled: dashboardQuery.isSuccess,
     retry: false,
   });
 

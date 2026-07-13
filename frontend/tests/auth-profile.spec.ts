@@ -19,12 +19,14 @@ test("landing to register, login, profile update, and logout", async ({ page }) 
   await page.getByLabel("Phone").fill("5550123456");
   await page.getByRole("button", { name: "Register" }).click();
 
-  await expect(page.getByRole("heading", { name: "Login" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Select Login Type" })).toBeVisible();
   await expect(page.getByText("Account created. Sign in to continue.")).toBeVisible();
+  await page.getByRole("button", { name: "Continue as Customer" }).click();
+  await expect(page.getByRole("heading", { name: "Customer Login", exact: true })).toBeVisible();
 
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("S3curePass!");
-  await page.getByRole("button", { name: "Login" }).click();
+  await page.getByRole("button", { name: "Login", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: /Welcome, Jordan/ })).toBeVisible();
   await page.getByRole("main").getByRole("link", { name: "Profile" }).click();
@@ -46,5 +48,5 @@ test("landing to register, login, profile update, and logout", async ({ page }) 
   await expect(page.getByText("Home")).toBeVisible();
 
   await page.getByRole("button", { name: "Logout" }).click();
-  await expect(page.getByRole("heading", { name: "Login" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Select Login Type" })).toBeVisible();
 });

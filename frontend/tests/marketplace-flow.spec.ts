@@ -90,9 +90,10 @@ test("login, browse, wishlist, cart, checkout, order history, logout", async ({ 
   });
 
   await page.goto("/login");
+  await page.getByRole("button", { name: "Continue as Customer" }).click();
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Login" }).click();
+  await page.getByRole("button", { name: "Login", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Welcome, Market/ })).toBeVisible();
 
   await page.getByRole("link", { name: "Categories" }).click();
@@ -125,5 +126,5 @@ test("login, browse, wishlist, cart, checkout, order history, logout", async ({ 
   await expect(page.getByText(productName)).toBeVisible();
 
   await page.getByRole("button", { name: "Logout" }).click();
-  await expect(page.getByRole("heading", { name: "Login" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Select Login Type" })).toBeVisible();
 });
